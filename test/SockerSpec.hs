@@ -9,55 +9,42 @@ spec :: Spec
 spec = undefined
 
 
-data State sing = forall next. (Read (MealyStepInput sing next), Show (MealyStepOutput sing next), MealyStep sing next) => State { unState :: sing next }
-
-type family InCtx (sing :: * -> *) :: * -> Constraint
-type family OutCtx (sing :: * -> *) :: * -> Constraint
-
-class MealyCtxs sing where
-    type InCtxs sing :: * -> Constraint
-    type OutCtxs sing :: * -> Constraint
-    getInput :: (InCtxs sing a) => a
-
-class (Read (MealyStepInput sing a), Show (MealyStepOutput sing a)) => MealyStep sing a where
-    data MealyStepInput sing a :: *
-    data MealyStepOutput sing a :: *
-    move :: -- (InCtx sing (MealyStepInput sing a), OutCtx sing (MealyStepOutput sing a))
-            {-(Read (MealyStepInput sing a), Show (MealyStepOutput sing a)) => -}
-            sing a
-            -> MealyStepInput sing a
-            -> (MealyStepOutput sing a, State sing)
+data State = State {  unState :: String -> (String, State) }
 
 
-data Start
-data Loop
+
+class MealyStep sing a where
+    move :: sing a -> String -> (String, State)
+
+
+data LoggedOut
+data LoggedIn
 
 -- The singleton contains constructors for all possible states
 data EgSing a where
-    StartSing :: EgSing Start
-    LoopSing  :: EgSing Loop
+    LoggedOutSing :: EgSing LoggedOut
+    LoggedInSing  :: EgSing LoggedIn
 
-{-instance MealyCtxs EgSing where-}
-    {-type InCtxs = Read-}
-    {-type OutCtxs = Show-}
+instance MealyStep EgSing LoggedIn where
+    move _ s | s == "logout" = ("now logged out!", State $ move LoggedOutSing)
+             | otherwise     = ("msg: " ++ s, State $ move LoggedInSing)
 
-instance MealyStep EgSing Loop where
-    data MealyStepInput EgSing Loop = LoopState Int
-        deriving (Show, Read, Eq)
-    data MealyStepOutput EgSing Loop = LoopOutput Bool
-        deriving (Show, Read, Eq)
-    move LoopSing (LoopState i) = (LoopOutput (i == 5), State LoopSing)
+instance MealyStep EgSing LoggedOut where
+    move _ s | s == "login" = ("now logged in!", State $ move LoggedInSing)
+             | otherwise     = ("messages not allowed", State $ move LoggedInSing)
 
-runMealy :: (MealyStep EgSing start) => EgSing start -> [String] -> [String]
-runMealy _ []        = []
-runMealy sing (i:is) = show o : runMealy s is
-  where
-    (o, s) = f sing i
+runMealy' :: State -> [String] -> [String]
+runMealy' _ []        = []
+runMealy' (State s) (i:is)    = o : runMealy' next is
+  where (o, next) = s i
 
-f :: (MealyStep EgSing a) => EgSing a -> String -> (MealyStepOutput EgSing a, EgSing b)
-f sing i = case move sing (read i) of
-        (o', State StartSing) -> (o', StartSing)
-        (o', State LoopSing)  -> (o', LoopSing)
+runMealy :: (MealyStep sing start) => sing start -> [String] -> [String]
+runMealy s = runMealy' (State (move s))
+
+{-f :: (MealyStep EgSing a) => EgSing a -> String -> (String, EgSing b)-}
+{-f sing i = case move sing i of-}
+        {-(o', State StartSing) -> (o', StartSing)-}
+        {-(o', State LoopSing)  -> (o', LoopSing)-}
 
 {-
 newtype Mealy' a = Mealy' {
