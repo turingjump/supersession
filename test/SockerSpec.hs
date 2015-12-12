@@ -6,32 +6,39 @@ import GHC.Exts
 import Socker.Internal.Mealy
 
 spec :: Spec
-spec = undefined
-
+spec = describe "it" $ do
+    it "should work" $
+        runMealy LoggedOutSing test `shouldBe` [ "now logged in!","msg: hi","now logged out!" ]
 
 data State = State {  unState :: String -> (String, State) }
 
 
 
-class MealyStep sing a where
-    move :: sing a -> String -> (String, State)
+class Read a => MealyStep sing a where
+    move :: sing a -> a -> (String, State)
 
 
-data LoggedOut
-data LoggedIn
+data LoggedOut = Login | Error
+    deriving (Eq, Show, Read)
+data LoggedIn = Msg String | Logout
+    deriving (Eq, Show, Read)
 
 -- The singleton contains constructors for all possible states
 data EgSing a where
     LoggedOutSing :: EgSing LoggedOut
     LoggedInSing  :: EgSing LoggedIn
 
+wrap sing = State (move sing . read)
+
 instance MealyStep EgSing LoggedIn where
-    move _ s | s == "logout" = ("now logged out!", State $ move LoggedOutSing)
-             | otherwise     = ("msg: " ++ s, State $ move LoggedInSing)
+    move = go
+      where go _ Logout  = ("now logged out!", wrap LoggedOutSing)
+            go _ (Msg m) = ("msg: " ++ m     , wrap LoggedInSing)
 
 instance MealyStep EgSing LoggedOut where
-    move _ s | s == "login" = ("now logged in!", State $ move LoggedInSing)
-             | otherwise     = ("messages not allowed", State $ move LoggedInSing)
+    move = go
+      where go _ Login = ("now logged in!", wrap LoggedInSing)
+            go _ Error = ("messages not allowed", wrap LoggedOutSing)
 
 runMealy' :: State -> [String] -> [String]
 runMealy' _ []        = []
@@ -39,8 +46,9 @@ runMealy' (State s) (i:is)    = o : runMealy' next is
   where (o, next) = s i
 
 runMealy :: (MealyStep sing start) => sing start -> [String] -> [String]
-runMealy s = runMealy' (State (move s))
+runMealy s = runMealy' (State (move s . read))
 
+test = ["Login", "Msg \"hi\"", "Logout"]
 {-f :: (MealyStep EgSing a) => EgSing a -> String -> (String, EgSing b)-}
 {-f sing i = case move sing i of-}
         {-(o', State StartSing) -> (o', StartSing)-}
