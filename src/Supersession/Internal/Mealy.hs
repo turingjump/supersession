@@ -1,9 +1,9 @@
 module Supersession.Internal.Mealy where
 
 import GHC.Exts
-import GHC.TypeLits (Symbol)
 
-wrap sing = State (move sing . read)
+next :: MealyStep sing a => sing a -> State
+next sing = State (move sing . read)
 
 
 data State = State {  unState :: String -> (String, State) }
@@ -16,8 +16,8 @@ class Read a => MealyStep sing a where
 
 runMealy' :: State -> [String] -> [String]
 runMealy' _ []        = []
-runMealy' (State s) (i:is)    = o : runMealy' next is
-  where (o, next) = s i
+runMealy' (State s) (i:is)    = o : runMealy' nextStep is
+  where (o, nextStep) = s i
 
 runMealy :: (MealyStep sing start) => sing start -> [String] -> [String]
 runMealy s = runMealy' (State (move s . read))
