@@ -1,9 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
-module SockerSpec (spec) where
+module SupersessionSpec (spec) where
 
 import Test.Hspec
 import GHC.Exts
-import Socker.Internal.Mealy
+import Supersession.Internal.Mealy
 
 spec :: Spec
 spec = describe "it" $ do

@@ -1,4 +1,4 @@
-module Socker.Internal.Mealy where
+module Supersession.Internal.Mealy where
 
 import GHC.Exts
 import GHC.TypeLits (Symbol)
