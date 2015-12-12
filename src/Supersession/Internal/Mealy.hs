@@ -1,30 +1,27 @@
 module Supersession.Internal.Mealy where
 
+import Control.Monad.State
+import Control.Monad
 import GHC.Exts
 
-next :: MealyStep sing a => sing a -> State
-next sing = State (move sing . read)
+next :: (Monad m, MealyStep sing a) => sing a -> Mealy m
+next sing = Mealy (move sing . read)
 
 
-data State = State {  unState :: String -> (String, State) }
+data Mealy (m :: * -> *) = Mealy {  unMealy :: String -> m (String, Mealy m) }
 
 
 
 class Read a => MealyStep sing a where
-    move :: sing a -> a -> (String, State)
+    move :: Monad m => sing a -> a -> m (String, Mealy m)
 
 
-runMealy' :: State -> [String] -> [String]
-runMealy' _ []        = []
-runMealy' (State s) (i:is)    = o : runMealy' nextStep is
-  where (o, nextStep) = s i
+runMealy' :: (Monad m) => Mealy m -> [String] -> m [String]
+runMealy' _ []             = return []
+runMealy' (Mealy m) (x:xs) =  m x >>= \(o, m') -> ( o :) <$> runMealy' m' xs
 
-runMealy :: (MealyStep sing start) => sing start -> [String] -> [String]
-runMealy s = runMealy' (State (move s . read))
-
-data HList a where
-    HNil :: HList '[]
-    HCons :: x -> HList xs -> HList (x ': xs)
+runMealy :: (Monad m, MealyStep sing start) => sing start -> [String] -> m [String]
+runMealy s = runMealy' (Mealy (move s . read))
 
 type family Elem a as :: Constraint where
     Elem a (a ': as) = ()

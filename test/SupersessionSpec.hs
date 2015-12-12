@@ -2,13 +2,14 @@
 module SupersessionSpec (spec) where
 
 import Test.Hspec
+import Control.Monad.Identity
 import Supersession.Internal.Mealy
 
 spec :: Spec
 spec = describe "it" $ do
     it "should work" $ do
         let test = ["Login \"jkarni\"", "Msg \"hi\"", "Logout"]
-        runMealy LoggedOutSing test `shouldBe` [ "now logged in as jkarni"
+        runMealy LoggedOutSing test `shouldBe` Identity [ "now logged in as jkarni"
                                                , "jkarni says: hi"
                                                , "now logged out!"
                                                ]
@@ -18,9 +19,9 @@ spec = describe "it" $ do
 data LoggedIn = Msg String | Logout
     deriving (Eq, Show, Read)
 
-loggedIn :: EgSing LoggedIn -> LoggedIn -> (String, State)
-loggedIn _ Logout  = ("now logged out!", next LoggedOutSing)
-loggedIn (LoggedInSing usr) (Msg m) = (usr ++ " says: " ++ m, next $ LoggedInSing usr)
+loggedIn :: Monad m => EgSing LoggedIn -> LoggedIn -> m (String, Mealy m)
+loggedIn _ Logout  = return ("now logged out!", next LoggedOutSing)
+loggedIn (LoggedInSing usr) (Msg m) = return (usr ++ " says: " ++ m, next $ LoggedInSing usr)
 
 instance MealyStep EgSing LoggedIn where
     move = loggedIn
@@ -30,9 +31,9 @@ instance MealyStep EgSing LoggedIn where
 data LoggedOut = Login Username | Error
     deriving (Eq, Show, Read)
 
-loggedOut :: LoggedOut -> (String, State)
-loggedOut (Login usr) = ("now logged in as " ++ usr, next $ LoggedInSing usr)
-loggedOut Error = ("messages not allowed", next LoggedOutSing)
+loggedOut :: Monad m => LoggedOut -> m (String, Mealy m)
+loggedOut (Login usr) = return ("now logged in as " ++ usr, next $ LoggedInSing usr)
+loggedOut Error = return ("messages not allowed", next LoggedOutSing)
 
 instance MealyStep EgSing LoggedOut where
     move _ = loggedOut
